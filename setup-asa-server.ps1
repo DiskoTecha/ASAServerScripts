@@ -1,65 +1,66 @@
-# Prompt for the SteamCMD installation directory
-$steamCmdPath = Read-Host "Enter the path where you want to install SteamCMD"
+# Params for the SteamCMD installation directory, start.bat content, and server install path
+param (
+    [string]$steamCmdPath,
+    [string]$installPath,
+    [string]$startBatContent
+)
 
-# Create the directory if it doesn't exist
+# Create SteamCMD folder if it doesn't exist
 if (-not (Test-Path $steamCmdPath)) {
     New-Item -Path $steamCmdPath -ItemType Directory
 }
 
-# Specify the path to the SteamCMD executable
-$steamCmdExecutable = Join-Path $steamCmdPath "steamcmd.exe"
+$steamCmdExecutable = Join-Path $steamCmdPath 'steamcmd.exe'
+$steamCmdJustInstalled = $false
 
-# Check if SteamCMD is already installed
-if (Test-Path $steamCmdExecutable) {
-    Write-Host "SteamCMD is already installed at $steamCmdPath."
-} else {
-    # If it doesn't exist, download and extract SteamCMD
-    $steamCmdUrl = "https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip"
-    $steamCmdZip = Join-Path $env:TEMP "steamcmd.zip"
+# Install SteamCMD if missing
+if (-not (Test-Path $steamCmdExecutable)) {
+    Write-Host 'Downloading SteamCMD...'
+    $steamCmdUrl = 'https://steamcdn-a.akamaihd.net/client/installer/steamcmd.zip'
+    $steamCmdZip = Join-Path $env:TEMP 'steamcmd.zip'
 
     Invoke-WebRequest -Uri $steamCmdUrl -OutFile $steamCmdZip
     Expand-Archive -Path $steamCmdZip -DestinationPath $steamCmdPath
     Remove-Item -Path $steamCmdZip
 
-    Write-Host "SteamCMD has been downloaded and extracted to $steamCmdPath."
-}
-
-# Store the start.bat content
-$startBatContent = Read-Host "Enter the start.bat content (e.g., start ArkAscendedServer.exe TheIsland_WP?listen?SessionName=ServerName?ServerAdminPassword=AdminPassword?Port=7777?QueryPort=27015?MaxPlayers=26 -UseBattlEye)"
-
-# Prompt for the ARK server installation directory
-$installPath = Read-Host "Enter the path where you want to install the ARK server"
-
-# Check if the ARK server path already exists
-if (Test-Path $installPath) {
-    Write-Host "ARK server directory already exists at $installPath. Proceeding to update ARK server..."
+    $steamCmdJustInstalled = $true
+    Write-Host ('SteamCMD installed to ' + $steamCmdPath + '.')
 } else {
-    # If it doesn't exist, create the directory and install the ARK server
+    Write-Host ('SteamCMD already installed at ' + $steamCmdPath + '.')
+}
+
+# Create ARK install directory if it doesn't exist
+if (-not (Test-Path $installPath)) {
     New-Item -Path $installPath -ItemType Directory
-    Write-Host "ARK server directory does not exist. Continuing to install ARK server..."
 }
 
-# Create the necessary directory structure
-$gameBinPath = Join-Path $installPath "ShooterGame\Binaries\Win64"
-if (-not (Test-Path $gameBinPath)) {
-    New-Item -Path $gameBinPath -ItemType Directory
+# Function to run SteamCMD
+function Run-AppUpdate {
+    param([string]$message)
+    Write-Host $message
+    & $steamCmdExecutable +force_install_dir "$installPath" +login anonymous +app_update 2430930 validate +quit -console
 }
 
-# Create start.bat in the Win64 folder
-$startBatPath = Join-Path $gameBinPath "start.bat"
+# First install/update run
+Run-AppUpdate 'Running SteamCMD to install/update ARK server...'
+
+# Check if the main executable exists, retry if not
+$serverExePath = Join-Path $installPath 'ShooterGame\Binaries\Win64\ArkAscendedServer.exe'
+if (-not (Test-Path $serverExePath)) {
+    Write-Host 'Server executable not found — retrying download...'
+    Run-AppUpdate 'Retrying SteamCMD app_update...'
+}
+
+# Final check
+if (-not (Test-Path $serverExePath)) {
+    Write-Host 'ERROR: ARK server executable still missing after install attempts.'
+    exit 1
+}
+
+# Create start.bat after install is complete
+$startBatPath = Join-Path (Split-Path $serverExePath -Parent) 'start.bat'
 Set-Content -Path $startBatPath -Value $startBatContent
+Write-Host ('start.bat created at ' + $startBatPath + '.')
 
-Write-Host "start.bat has been created in $startBatPath."
-
-# Install or update ARK server
-$arkServerCmd = Join-Path $steamCmdPath "steamcmd.exe"
-$forceInstallDir = "+force_install_dir $installPath"
-$appUpdate = "+app_update 2430930 validate"
-
-& $arkServerCmd $forceInstallDir "+login anonymous" $appUpdate "+quit"
-
-Write-Host "ARK server installed or updated in $installPath."
-
-# You can customize the ARK server startup command here
-Write-Host "You can start the ARK server with the following command:"
-Write-Host "$installPath\ShooterGame\Binaries\Win64\start.bat"
+Write-Host 'ARK server installed or updated successfully.'
+Write-Host ('You can start the ARK server with: ' + $startBatPath)
