@@ -2,7 +2,8 @@
 param (
     [string]$steamCmdPath,
     [string]$installPath,
-    [string]$startBatContent
+    [string]$startBatContent,
+    [string]$gameUserSettingsTemplate
 )
 
 # Create SteamCMD folder if it doesn't exist
@@ -11,7 +12,6 @@ if (-not (Test-Path $steamCmdPath)) {
 }
 
 $steamCmdExecutable = Join-Path $steamCmdPath 'steamcmd.exe'
-$steamCmdJustInstalled = $false
 
 # Install SteamCMD if missing
 if (-not (Test-Path $steamCmdExecutable)) {
@@ -23,7 +23,6 @@ if (-not (Test-Path $steamCmdExecutable)) {
     Expand-Archive -Path $steamCmdZip -DestinationPath $steamCmdPath
     Remove-Item -Path $steamCmdZip
 
-    $steamCmdJustInstalled = $true
     Write-Host ('SteamCMD installed to ' + $steamCmdPath + '.')
 } else {
     Write-Host ('SteamCMD already installed at ' + $steamCmdPath + '.')
@@ -62,5 +61,18 @@ $startBatPath = Join-Path (Split-Path $serverExePath -Parent) 'start.bat'
 Set-Content -Path $startBatPath -Value $startBatContent
 Write-Host ('start.bat created at ' + $startBatPath + '.')
 
+# GameUserSettings.ini path
+$gameUserSettingsPath = Join-Path $installPath 'ShooterGame\Saved\Config\WindowsServer\GameUserSettings.ini'
+
+# Ensure parent directory exists
+New-Item -ItemType Directory -Path (Split-Path $gameUserSettingsPath) -Force | Out-Null
+
+# Create template GameUserSettings.ini if it doesn't exist
+if (-not (Test-Path $gameUserSettingsPath)) {
+    Write-Host 'No GameUserSettings.ini file found, creating template...'
+    Set-Content -Path $gameUserSettingsPath -Value $gameUserSettingsTemplate
+}
+
+# Relay completion
 Write-Host 'ARK server installed or updated successfully.'
-Write-Host ('You can start the ARK server with: ' + $startBatPath)
+Write-Host 'You can start the ARK server with the Run Server button.'

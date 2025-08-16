@@ -13,6 +13,7 @@ from PyQt5.QtCore import QThread, pyqtSignal, QRegExp, QTimer
 steam_cmd_path = ""
 install_path = ""
 start_bat_content = ""
+game_user_settings_template = ""
 
 def resource_path(relative_path):
     # For the temp folder created by PYINSTALLER
@@ -36,7 +37,8 @@ class ScriptRunner(QThread):
             "powershell", "-ExecutionPolicy", "Bypass", "-File", ps1_path,
             "-steamCmdPath", steam_cmd_path,
             "-installPath", install_path,
-            "-startBatContent", start_bat_content
+            "-startBatContent", start_bat_content,
+            "-gameUserSettingsTemplate", game_user_settings_template
         ],
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
@@ -187,6 +189,7 @@ class ArkManager(QMainWindow):
                 install_path = self.arkInstallInput.text().strip()
 
                 self.create_start_bat_content()
+                self.create_game_user_settings_template()
 
                 self.worker = ScriptRunner()
                 self.worker.output.connect(self.append_output)
@@ -373,7 +376,18 @@ class ArkManager(QMainWindow):
     def create_start_bat_content(self):
         server_exe_path = os.path.join(install_path, "ShooterGame", "Binaries", "Win64", "ArkAscendedServer.exe")
         global start_bat_content
-        start_bat_content = f'"{server_exe_path}" TheIsland_WP?listen?SessionName={self.serverNameInput.text().strip()}?ServerAdminPassword={self.serverAdminPasswordInput.text().strip()}?ServerPassword={self.serverPasswordInput.text().strip()}?Port={self.serverPortInput.text().strip()}?QueryPort={self.serverQueryPortInput.text().strip()}?MaxPlayers={self.serverMaxPlayersInput.text().strip()} -server -log {self.serverLaunchOptionsInput.text().strip()}'
+        start_bat_content = f'"{server_exe_path}" TheIsland_WP?listen?SessionName={self.serverNameInput.text().strip()} -server -log {self.serverLaunchOptionsInput.text().strip()}'
+
+    def create_game_user_settings_template(self):
+        global game_user_settings_template
+        game_user_settings_template = f"""[ServerSettings]
+ServerAdminPassword={self.serverAdminPasswordInput.text().strip()}
+ServerPassword={self.serverPasswordInput.text().strip()}
+SessionName={self.serverNameInput.text().strip()}
+Port={self.serverPortInput.text().strip()}
+QueryPort={self.serverQueryPortInput.text().strip()}
+MaxPlayers={self.serverMaxPlayersInput.text().strip()}
+"""
 
     def __check_valid_path_inputs(self, check_steam_cmd=True, check_ark_install=True, settings_editor=False):
         if check_steam_cmd:
